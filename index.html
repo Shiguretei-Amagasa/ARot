@@ -19,23 +19,15 @@
       text-align: center; padding: 20px; box-sizing: border-box;
     }
     /*
-      注意: video要素のwidth/height/object-fitを!importantで強制すると、
-      AR.jsが「リクエスト解像度 vs 実際のカメラ解像度」のズレを補正するために
-      自前で適用しているCSS変形(transform: scale/translate)と二重に衝突し、
-      画角が崩れる原因になる。ここでは触らずAR.jsに任せる。
-    */
-    /*
       video要素: AR.jsはここに自前のtransform(scale/translate)を適用して
       カメラ映像とトラッキング座標を一致させている。
-      width/heightを固定値で!important指定すると、その変形と二重に衝突して
-      映像が縦横比おかしく潰れる原因になるため、position/z-indexのみ指定し、
-      width/heightはAR.js側のinline style(transform込み)に任せる。
+      width/heightの固定指定や負のz-indexを付けると、AR.js側の変形やDOM標準の
+      重なり順と衝突し、最悪「html/bodyの白背景より奥」に回り込んで映像・3Dオブジェクト
+      ごと見えなくなる。position/z-indexには触れず、DOMの並び順(video→a-scene)に
+      重なり順を任せる。
     */
-    video {
-      position: absolute !important;
-      top: 0 !important;
-      left: 0 !important;
-      z-index: -2 !important;
+    body {
+      background: black;
     }
     /* デバッグステータス表示（マーカー検知確認用。確認後はdisplay:noneでOK） */
     #debug-status {
@@ -68,9 +60,7 @@
   </a-assets>
 
   <!-- .pattはindexと同じ階層にある前提のパス -->
-  <!-- 切り分けテスト用: 動作実績のあるHiroマーカーに一時差し替え中
-       (元に戻す時は url="ARot_marker.patt" に戻してください) -->
-  <a-marker type="pattern" url="https://raw.githack.com/AR-js-org/AR.js/master/data/data/patt.hiro" id="treasure-marker" emitevents="true">
+  <a-marker type="pattern" url="ARot_marker.patt" id="treasure-marker" emitevents="true">
 
     <a-entity id="treasure-wrapper" scale="0 0 0" position="0 0 0">
 
