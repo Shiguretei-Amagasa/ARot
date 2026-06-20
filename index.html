@@ -10,7 +10,8 @@
       position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
       background: rgba(0,0,0,0.8); color: white; display: flex;
       justify-content: center; align-items: center; z-index: 9999;
-      font-family: sans-serif; font-weight: bold; font-size: 1.2rem; cursor: pointer;
+      font-family: sans-serif; font-weight: bold; font-size: 1.2rem; 
+      cursor: pointer; pointer-events: auto; /* 確実にタップを奪う */
     }
   </style>
 </head>
@@ -80,6 +81,7 @@ class SoundManager {
     if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
     if (this.ctx.state === 'suspended') await this.ctx.resume();
     this.unlocked = true;
+    console.log("🔊 Web Audio Context が正常に解放されました");
   }
   scheduleTone(freq, type, startTimeOffset, duration, vol) {
     if (!this.unlocked) return;
@@ -124,6 +126,7 @@ class SoundManager {
 // ==========================================
 class TreasureEngine {
   constructor() {
+    console.log("🛠️ TreasureEngine を構築中...");
     this.els = {
       scene: document.querySelector("a-scene"),
       marker: document.querySelector("#treasure-marker"),
@@ -139,7 +142,6 @@ class TreasureEngine {
     
     this.canvasEl = document.querySelector("#textCanvas");
     this.ctx = null; 
-
     this.sound = new SoundManager();
     this.state = 'IDLE'; 
     
@@ -149,8 +151,14 @@ class TreasureEngine {
       "10%OFF": { color: "#FFD700", scale: "1.8 1.8 1.8", rot: "0 0 -6",  glow: 60,  soundType: "10%OFF" }
     };
 
-    document.querySelector("#start-ui").addEventListener("click", async (e) => {
-      e.target.style.display = "none";
+    const startUI = document.querySelector("#start-ui");
+    
+    // 【修正】click と touchstart の両方で確実に発火させるイベントハンドラー
+    const onStartTrigger = async (e) => {
+      e.preventDefault();
+      console.log("👉 スタート画面がタップされました");
+      
+      startUI.style.display = "none";
       await this.sound.init();
       
       if (this.els.scene.hasLoaded) {
@@ -159,24 +167,40 @@ class TreasureEngine {
         this.els.scene.addEventListener('loaded', () => this.initCanvasContext());
       }
       
-      // emitevents="true" により、ここが確実に動作するようになります
       this.els.marker.addEventListener("markerFound", () => {
+        console.log("🎯 マーカー [ARot_marker] を検知しました！");
         this.triggerAppear();
       });
 
+      this.els.marker.addEventListener("markerLost", () => {
+        console.log("🔍 マーカーを見失いました");
+      });
+
+      // 箱を開けるためのクリックイベント
       document.body.addEventListener("click", () => {
         if (this.state === 'READY_TO_OPEN') {
           this.triggerOpen();
         }
       });
-    });
+      
+      // 重複発火を防ぐためにリスナーを解除
+      startUI.removeEventListener("click", onStartTrigger);
+      startUI.removeEventListener("touchstart", onStartTrigger);
+    };
+
+    startUI.addEventListener("click", onStartTrigger);
+    startUI.addEventListener("touchstart", onStartTrigger, { passive: false });
+    
+    console.log("✅ スタートイベントの初期登録が完了しました");
   }
 
   initCanvasContext() {
     if (this.canvasEl && !this.ctx) {
       this.ctx = this.canvasEl.getContext("2d", { willReadFrequently: true });
-      if (!this.ctx) {
-        console.error("Failed to get 2D context from #textCanvas");
+      if (this.ctx) {
+        console.log("🎨 2D Canvas コンテキストの取得に成功しました");
+      } else {
+        console.error("❌ 2D コンテキストの取得に失敗");
       }
     }
   }
@@ -221,15 +245,18 @@ class TreasureEngine {
   async triggerAppear() {
     if (this.state !== 'IDLE') return;
     this.state = 'APPEARING';
+    console.log("📦 宝箱のポップイン演出を開始します");
     this.sound.playAppear();
     await this.anim(this.els.wrapper, "pop1", "scale", "1.2 1.2 1.2", 180, "easeOutQuad");
     await this.anim(this.els.wrapper, "pop2", "scale", "0.9 0.9 0.9", 120, "easeOutQuad");
     await this.anim(this.els.wrapper, "pop3", "scale", "1 1 1", 90, "easeOutQuad");
+    console.log("👍 宝箱準備完了。画面タップで開封できます");
     this.state = 'READY_TO_OPEN';
   }
 
   async triggerOpen() {
     this.state = 'OPENING';
+    console.log("💥 開封：宝箱をバラバラに展開します");
     this.sound.playOpen();
     const keys = Object.keys(this.config);
     const resultKey = keys[Math.floor(Math.random() * keys.length)];
