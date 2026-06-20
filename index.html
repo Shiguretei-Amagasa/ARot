@@ -18,12 +18,17 @@
       cursor: pointer; text-shadow: 0 0 10px #00ffff;
       text-align: center; padding: 20px; box-sizing: border-box;
     }
-    /* AR.jsが自動生成するビデオ要素の予期せぬ歪みを防止するCSS */
+    /*
+      注意: video要素のwidth/height/object-fitを!importantで強制すると、
+      AR.jsが「リクエスト解像度 vs 実際のカメラ解像度」のズレを補正するために
+      自前で適用しているCSS変形(transform: scale/translate)と二重に衝突し、
+      画角が崩れる原因になる。ここでは触らずAR.jsに任せる。
+    */
     video {
-      width: 100vw !important;
-      height: 100vh !important;
-      object-fit: cover !important;
-      position: absolute; top: 0; left: 0; z-index: -2;
+      z-index: -2 !important;
+    }
+    canvas.a-canvas {
+      z-index: -1;
     }
     /* デバッグステータス表示（マーカー検知確認用。確認後はdisplay:noneでOK） */
     #debug-status {
@@ -44,8 +49,8 @@
 
 <a-scene embedded
          arjs="sourceType: webcam;
-               sourceWidth: 1280; sourceHeight: 720;
-               displayWidth: 1280; displayHeight: 720;
+               sourceWidth: 640; sourceHeight: 480;
+               displayWidth: 640; displayHeight: 480;
                debugUIEnabled: true;
                detectionMode: mono;"
          renderer="logarithmicDepthBuffer: true; colorManagement: true;"
