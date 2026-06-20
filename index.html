@@ -24,11 +24,18 @@
       自前で適用しているCSS変形(transform: scale/translate)と二重に衝突し、
       画角が崩れる原因になる。ここでは触らずAR.jsに任せる。
     */
+    /*
+      video要素: AR.jsはここに自前のtransform(scale/translate)を適用して
+      カメラ映像とトラッキング座標を一致させている。
+      width/heightを固定値で!important指定すると、その変形と二重に衝突して
+      映像が縦横比おかしく潰れる原因になるため、position/z-indexのみ指定し、
+      width/heightはAR.js側のinline style(transform込み)に任せる。
+    */
     video {
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
       z-index: -2 !important;
-    }
-    canvas.a-canvas {
-      z-index: -1;
     }
     /* デバッグステータス表示（マーカー検知確認用。確認後はdisplay:noneでOK） */
     #debug-status {
