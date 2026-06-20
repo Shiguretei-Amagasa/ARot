@@ -68,7 +68,9 @@
   </a-assets>
 
   <!-- .pattはindexと同じ階層にある前提のパス -->
-  <a-marker type="pattern" url="ARot_marker.patt" id="treasure-marker" emitevents="true">
+  <!-- 切り分けテスト用: 動作実績のあるHiroマーカーに一時差し替え中
+       (元に戻す時は url="ARot_marker.patt" に戻してください) -->
+  <a-marker type="pattern" url="https://raw.githack.com/AR-js-org/AR.js/master/data/data/patt.hiro" id="treasure-marker" emitevents="true">
 
     <a-entity id="treasure-wrapper" scale="0 0 0" position="0 0 0">
 
