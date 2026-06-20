@@ -7,13 +7,8 @@
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   
   <style>
-    /* 全画面でカメラが正しく追従するためのスタイル定義 */
     html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
+      margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
     }
     #start-ui {
       position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
@@ -21,6 +16,14 @@
       justify-content: center; align-items: center; z-index: 9999;
       font-family: monospace; font-weight: bold; font-size: 1.2rem; 
       cursor: pointer; text-shadow: 0 0 10px #00ffff;
+    }
+    /* AR.jsが自動生成するビデオ要素の予期せぬ歪みを防止するCSS 
+    */
+    video {
+      width: 100vw !important;
+      height: 100vh !important;
+      object-fit: cover !important;
+      position: absolute; top: 0; left: 0; z-index: -2;
     }
   </style>
 </head>
@@ -31,7 +34,11 @@
 </div>
 
 <a-scene embedded 
-         arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono;"
+         arjs="sourceType: webcam; 
+               sourceWidth: 1280; sourceHeight: 720; 
+               displayWidth: 1280; displayHeight: 720; 
+               debugUIEnabled: false; 
+               detectionMode: mono;"
          renderer="logarithmicDepthBuffer: true; colorManagement: true;">
   
   <a-assets>
@@ -68,6 +75,7 @@ class SoundManager {
       if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
       if (this.ctx.state === 'suspended') await this.ctx.resume();
       this.unlocked = true;
+      console.log("🔊 Web Audio 初期化完了");
     } catch(e) { console.warn("Audio init deferred:", e); }
   }
   scheduleTone(freq, type, startTimeOffset, duration, vol) {
@@ -110,6 +118,7 @@ class TreasureEngine {
 
     this.initEntities();
     this.bindAREvents();
+    console.log("🛠️ TreasureEngine が初期化されました");
   }
 
   initEntities() {
