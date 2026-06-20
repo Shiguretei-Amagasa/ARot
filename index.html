@@ -3,9 +3,18 @@
 <head>
   <meta charset="utf-8">
   <title>ARot proto</title>
-  <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+  <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  
   <style>
+    /* 全画面でカメラが正しく追従するためのスタイル定義 */
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
     #start-ui {
       position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
       background: rgba(0,0,0,0.9); color: #00ffff; display: flex;
@@ -14,51 +23,22 @@
       cursor: pointer; text-shadow: 0 0 10px #00ffff;
     }
   </style>
-
-  <script>
-    // =================================================================
-    // 【劇的改善】A-Frame純正コンポーネントの登録
-    // AR.jsの準備完了タイミングと同期して、確実にイベントをバインドします
-    // =================================================================
-    AFRAME.registerComponent('treasure-marker-handler', {
-      init: function () {
-        console.log("🤖 [Component] マーカーハンドラーがシステムに登録されました");
-
-        // マーカーを検知したとき
-        this.el.addEventListener('markerFound', () => {
-          console.log("🎯 [Component] 画面上に ARot マーカーを検知しました！");
-          if (window.treasureEngine) {
-            window.treasureEngine.triggerAppear();
-          }
-        });
-
-        // マーカーを見失ったとき
-        this.el.addEventListener('markerLost', () => {
-          console.log("🔍 [Component] マーカーを見失いました");
-        });
-      }
-    });
-  </script>
 </head>
-<body style="margin: 0; overflow: hidden;">
+<body>
 
 <div id="start-ui" onclick="this.style.display='none'; if(window.startAR) window.startAR();">
   ■ [TAP TO START ARot PROTO] ■
 </div>
 
 <a-scene embedded 
-         arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best; canvas-will-read-frequently: true;" 
-         renderer="alpha: true">
+         arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono;"
+         renderer="logarithmicDepthBuffer: true; colorManagement: true;">
   
   <a-assets>
     <canvas id="textCanvas" width="1024" height="512"></canvas>
   </a-assets>
 
-  <a-marker type="pattern" 
-            url="ARot_marker.patt" 
-            id="treasure-marker" 
-            emitevents="true" 
-            treasure-marker-handler>
+  <a-marker type="pattern" url="ARot_marker.patt" id="treasure-marker" emitevents="true">
     
     <a-entity id="treasure-wrapper" scale="0 0 0" position="0 0 0">
       
@@ -81,9 +61,6 @@
 </a-scene>
 
 <script>
-// ==========================================
-// 1. サウンドマネージャー
-// ==========================================
 class SoundManager {
   constructor() { this.ctx = null; this.unlocked = false; }
   async init() {
@@ -91,7 +68,6 @@ class SoundManager {
       if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
       if (this.ctx.state === 'suspended') await this.ctx.resume();
       this.unlocked = true;
-      console.log("🔊 Web Audio 初期化完了");
     } catch(e) { console.warn("Audio init deferred:", e); }
   }
   scheduleTone(freq, type, startTimeOffset, duration, vol) {
@@ -119,9 +95,6 @@ class SoundManager {
   }
 }
 
-// ==========================================
-// 2. AR 宝箱メインエンジン
-// ==========================================
 class TreasureEngine {
   constructor() {
     this.sound = new SoundManager();
@@ -136,11 +109,13 @@ class TreasureEngine {
     };
 
     this.initEntities();
-    this.bindGlobalEvents();
+    this.bindAREvents();
   }
 
   initEntities() {
     this.els = {
+      scene: document.querySelector("a-scene"),
+      marker: document.querySelector("#treasure-marker"),
       wrapper: document.querySelector("#treasure-wrapper"),
       pFront: document.querySelector("#p-front"),
       pBack: document.querySelector("#p-back"),
@@ -155,12 +130,18 @@ class TreasureEngine {
 
   initCanvasContext() {
     if (this.canvasEl && !this.ctx) {
-      this.ctx = this.canvasEl.getContext("2d", { willReadFrequently: true });
+      this.ctx = this.canvasEl.getContext("2d");
     }
   }
 
-  bindGlobalEvents() {
-    // 画面全体のクリックで開封（宝箱が出現している状態のときのみ有効）
+  bindAREvents() {
+    if (!this.els.marker) return;
+
+    this.els.marker.addEventListener("markerFound", () => {
+      console.log("🎯 マーカーを検知しました！");
+      this.triggerAppear();
+    });
+
     document.body.addEventListener("click", () => {
       if (this.state === 'READY_TO_OPEN') {
         this.triggerOpen();
@@ -207,7 +188,6 @@ class TreasureEngine {
   async triggerAppear() {
     if (this.state !== 'IDLE') return;
     this.state = 'APPEARING';
-    console.log("🚀 宝箱ポップイン演出開始");
     this.sound.playAppear();
     await this.anim(this.els.wrapper, "pop1", "scale", "1.2 1.2 1.2", 180, "easeOutQuad");
     await this.anim(this.els.wrapper, "pop2", "scale", "0.9 0.9 0.9", 120, "easeOutQuad");
@@ -247,12 +227,11 @@ class TreasureEngine {
   }
 }
 
-// グローバル展開
+let engineInstance = null;
 window.startAR = async function() {
-  if (!window.treasureEngine) {
-    window.treasureEngine = new TreasureEngine();
-    await window.treasureEngine.sound.init();
-    console.log("🛠️ TreasureEngine がグローバルに生成されました");
+  if (!engineInstance) {
+    engineInstance = new TreasureEngine();
+    await engineInstance.sound.init();
   }
 };
 </script>
