@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <title>ARot proto</title>
   <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-  
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@master/aframe/build/aframe-ar.js"></script>
+
   <style>
     html, body {
       margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
@@ -14,16 +14,23 @@
       position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
       background: rgba(0,0,0,0.9); color: #00ffff; display: flex;
       justify-content: center; align-items: center; z-index: 9999;
-      font-family: monospace; font-weight: bold; font-size: 1.2rem; 
+      font-family: monospace; font-weight: bold; font-size: 1.2rem;
       cursor: pointer; text-shadow: 0 0 10px #00ffff;
+      text-align: center; padding: 20px; box-sizing: border-box;
     }
-    /* AR.jsが自動生成するビデオ要素の予期せぬ歪みを防止するCSS 
-    */
+    /* AR.jsが自動生成するビデオ要素の予期せぬ歪みを防止するCSS */
     video {
       width: 100vw !important;
       height: 100vh !important;
       object-fit: cover !important;
       position: absolute; top: 0; left: 0; z-index: -2;
+    }
+    /* デバッグステータス表示（マーカー検知確認用。確認後はdisplay:noneでOK） */
+    #debug-status {
+      position: fixed; top: 8px; left: 8px; z-index: 10000;
+      background: rgba(0,0,0,0.7); color: #0f0; font-family: monospace;
+      font-size: 12px; padding: 6px 10px; border-radius: 4px;
+      white-space: pre-line; pointer-events: none;
     }
   </style>
 </head>
@@ -33,22 +40,26 @@
   ■ [TAP TO START ARot PROTO] ■
 </div>
 
-<a-scene embedded 
-         arjs="sourceType: webcam; 
-               sourceWidth: 1280; sourceHeight: 720; 
-               displayWidth: 1280; displayHeight: 720; 
-               debugUIEnabled: false; 
+<div id="debug-status">init...</div>
+
+<a-scene embedded
+         arjs="sourceType: webcam;
+               sourceWidth: 1280; sourceHeight: 720;
+               displayWidth: 1280; displayHeight: 720;
+               debugUIEnabled: true;
                detectionMode: mono;"
-         renderer="logarithmicDepthBuffer: true; colorManagement: true;">
-  
+         renderer="logarithmicDepthBuffer: true; colorManagement: true;"
+         vr-mode-ui="enabled: false">
+
   <a-assets>
     <canvas id="textCanvas" width="1024" height="512"></canvas>
   </a-assets>
 
+  <!-- .pattはindexと同じ階層にある前提のパス -->
   <a-marker type="pattern" url="ARot_marker.patt" id="treasure-marker" emitevents="true">
-    
+
     <a-entity id="treasure-wrapper" scale="0 0 0" position="0 0 0">
-      
+
       <a-box id="bottom-plate" width="1.6" height="0.04" depth="1" position="0 0.02 0" color="#2c2e3e"></a-box>
 
       <a-entity id="p-front" position="0 0 0.5"><a-box width="1.6" height="1" depth="0.04" position="0 0.5 0" color="#2c2e3e"></a-box></a-entity>
@@ -68,6 +79,22 @@
 </a-scene>
 
 <script>
+// ===== デバッグ状態表示ユーティリティ（行 約115〜130） =====
+const debugEl = document.querySelector("#debug-status");
+function setDebug(msg) {
+  console.log("[ARot]", msg);
+  if (debugEl) debugEl.textContent = msg;
+}
+
+setDebug("ページ読み込み完了\nA-Frame/AR.js 読み込み待ち...");
+
+window.addEventListener("load", () => {
+  setDebug(
+    "A-Frame: " + (typeof AFRAME !== "undefined" ? "OK" : "NG(読み込み失敗)") +
+    "\nマーカー画像認識待ち..."
+  );
+});
+
 class SoundManager {
   constructor() { this.ctx = null; this.unlocked = false; }
   async init() {
@@ -106,10 +133,10 @@ class SoundManager {
 class TreasureEngine {
   constructor() {
     this.sound = new SoundManager();
-    this.state = 'IDLE'; 
+    this.state = 'IDLE';
     this.ctx = null;
     this.canvasEl = document.querySelector("#textCanvas");
-    
+
     this.config = {
       "残念":   { color: "#777777", scale: "0.9 0.9 0.9", rot: "0 0 0",   glow: 5,   soundType: "残念" },
       "5%OFF":  { color: "#1E90FF", scale: "1.3 1.3 1.3", rot: "0 0 2",   glow: 25,  soundType: "5%OFF" },
@@ -144,11 +171,19 @@ class TreasureEngine {
   }
 
   bindAREvents() {
-    if (!this.els.marker) return;
+    if (!this.els.marker) {
+      setDebug("エラー: #treasure-marker 要素が見つかりません");
+      return;
+    }
 
+    // ===== マーカーロード自体の成否（行 約215付近） =====
     this.els.marker.addEventListener("markerFound", () => {
-      console.log("🎯 マーカーを検知しました！");
+      setDebug("✅ マーカー検知！(markerFound)");
       this.triggerAppear();
+    });
+
+    this.els.marker.addEventListener("markerLost", () => {
+      setDebug("マーカーロスト(markerLost)\n再度カメラを向けてください");
     });
 
     document.body.addEventListener("click", () => {
@@ -174,10 +209,10 @@ class TreasureEngine {
     if (!this.ctx) this.initCanvasContext();
     const ctx = this.ctx;
     if (!ctx) return;
-    
+
     const canvasEl = this.canvasEl;
     const cfg = this.config[resultKey];
-    
+
     ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
     ctx.font = "bold 160px sans-serif";
     ctx.textAlign = "center";
@@ -202,6 +237,7 @@ class TreasureEngine {
     await this.anim(this.els.wrapper, "pop2", "scale", "0.9 0.9 0.9", 120, "easeOutQuad");
     await this.anim(this.els.wrapper, "pop3", "scale", "1 1 1", 90, "easeOutQuad");
     this.state = 'READY_TO_OPEN';
+    setDebug("出現完了\n画面をタップして開封してください");
   }
 
   async triggerOpen() {
@@ -210,7 +246,7 @@ class TreasureEngine {
     const keys = Object.keys(this.config);
     const resultKey = keys[Math.floor(Math.random() * keys.length)];
     const cfg = this.config[resultKey];
-    
+
     this.renderText(resultKey);
 
     const boxPromise = Promise.all([
@@ -233,11 +269,13 @@ class TreasureEngine {
       this.anim(this.els.result, "show_p", "position", "0 1.8 0", 700, "easeOutBack")
     ]);
     this.state = 'DONE';
+    setDebug("結果表示完了: " + resultKey);
   }
 }
 
 let engineInstance = null;
 window.startAR = async function() {
+  setDebug("カメラ起動中...");
   if (!engineInstance) {
     engineInstance = new TreasureEngine();
     await engineInstance.sound.init();
