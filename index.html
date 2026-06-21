@@ -29,7 +29,7 @@
 </div>
 
 <a-scene
-  mindar-image="imageTargetSrc: ARot_marker.mind; autoStart: false; uiScanning: yes; uiLoading: yes; uiVR: false;"
+  mindar-image="imageTargetSrc: ARot_marker.mind; autoStart: true; uiScanning: no; uiLoading: no; uiVR: false;"
   renderer="logarithmicDepthBuffer: true; colorManagement: true;"
   vr-mode-ui="enabled: false">
 
@@ -65,12 +65,12 @@ function setDebug(msg) {
   console.log("[ARot]", msg);
 }
 
-setDebug("ページ読み込み完了\nA-Frame/MindAR 読み込み待ち...");
+setDebug("ページ読み込み完了\nカメラ自動起動中...");
 
 window.addEventListener("load", () => {
   setDebug(
     "A-Frame: " + (typeof AFRAME !== "undefined" ? "OK" : "NG") +
-    "\n画像認識スタート待ち..."
+    "\nタップしてデモを開始してください。"
   );
 });
 
@@ -257,14 +257,8 @@ class TreasureEngine {
 
 let engineInstance = null;
 window.startAR = async function() {
-  setDebug("ユーザーインタラクションを検知: カメラシステム及びサウンドの起動を開始します...");
+  setDebug("スタートUIを解除。ゲームエンジンとサウンドの初期化を行います。");
   
-  // autoStart: false にしたため、ここで明示的にMindARのシステムを走らせます
-  const sceneEl = document.querySelector('a-scene');
-  if (sceneEl && sceneEl.systems['mindar-image-system']) {
-    sceneEl.systems['mindar-image-system'].start();
-  }
-
   if (!engineInstance) {
     engineInstance = new TreasureEngine();
     await engineInstance.sound.init();
