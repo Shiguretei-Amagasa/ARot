@@ -2,13 +2,16 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>ARot proto</title>
-  <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.8/aframe/build/aframe-ar.js"></script>
+  <title>ARot proto (MindAR)</title>
+
+  <!-- MindARが動作確認しているA-Frameバージョンに合わせる -->
+  <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.1.4/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
     html, body {
       margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+      background: black;
     }
     #start-ui {
       position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
@@ -18,17 +21,6 @@
       cursor: pointer; text-shadow: 0 0 10px #00ffff;
       text-align: center; padding: 20px; box-sizing: border-box;
     }
-    /*
-      video要素: AR.jsはここに自前のtransform(scale/translate)を適用して
-      カメラ映像とトラッキング座標を一致させている。
-      width/heightの固定指定や負のz-indexを付けると、AR.js側の変形やDOM標準の
-      重なり順と衝突し、最悪「html/bodyの白背景より奥」に回り込んで映像・3Dオブジェクト
-      ごと見えなくなる。position/z-indexには触れず、DOMの並び順(video→a-scene)に
-      重なり順を任せる。
-    */
-    body {
-      background: black;
-    }
   </style>
 </head>
 <body>
@@ -37,21 +29,31 @@
   ■ [TAP TO START ARot PROTO] ■
 </div>
 
-<a-scene embedded
-         arjs="sourceType: webcam;
-               sourceWidth: 640; sourceHeight: 480;
-               displayWidth: 640; displayHeight: 480;
-               debugUIEnabled: false;
-               detectionMode: mono;"
-         renderer="logarithmicDepthBuffer: true; colorManagement: true;"
-         vr-mode-ui="enabled: false">
+<!--
+  MindARはAR.jsと違い、startボタンを押した瞬間にカメラ起動するのではなく、
+  a-scene読み込み時点でmindar-imageコンポーネントが自動的にカメラ初期化を始める。
+  startARは「サウンド初期化(AudioContext unlock)」と「TreasureEngine起動」専用にする。
+-->
+<a-scene
+  mindar-image="imageTargetSrc: ARot_marker.mind; autoStart: true; uiScanning: yes; uiLoading: yes;"
+  color-space="sRGB"
+  renderer="colorManagement: true, physicallyCorrectLights"
+  vr-mode-ui="enabled: false"
+  device-orientation-permission-ui="enabled: false">
 
   <a-assets>
     <canvas id="textCanvas" width="1024" height="512"></canvas>
   </a-assets>
 
-  <!-- .pattはindexと同じ階層にある前提のパス -->
-  <a-marker type="pattern" url="ARot_marker.patt" id="treasure-marker" emitevents="true">
+  <a-camera position="0 0 0" look-controls="enabled: false" cursor="fuse: false; rayOrigin: mouse;"></a-camera>
+
+  <!--
+    MindARのtargetIndex: 0 は、.mind生成時にアップロードした画像の順番に対応。
+    今回はARot_marker.mindに1枚しか含めていない想定なのでindex 0固定。
+    座標系: ターゲット画像の物理的な「幅」が1ユニットになる(正方形画像なら高さも1)。
+    AR.js時代のtreasure-wrapper以下の数値(width:1.6など)は基本そのまま使い回せる。
+  -->
+  <a-entity id="treasure-marker" mindar-image-target="targetIndex: 0">
 
     <a-entity id="treasure-wrapper" scale="0 0 0" position="0 0 0">
 
@@ -68,18 +70,16 @@
       <a-plane id="resultPlane" position="0 0.5 0" width="3" height="1.5" material="src: #textCanvas; transparent: true; opacity: 0" scale="0 0 0" rotation="0 0 0"></a-plane>
 
     </a-entity>
-  </a-marker>
+  </a-entity>
 
-  <a-entity camera></a-entity>
 </a-scene>
 
 <script>
-// ===== デバッグ状態表示ユーティリティ（行 約115〜130） =====
 function setDebug(msg) {
   console.log("[ARot]", msg);
 }
 
-setDebug("ページ読み込み完了\nA-Frame/AR.js 読み込み待ち...");
+setDebug("ページ読み込み完了\nA-Frame/MindAR 読み込み待ち...");
 
 window.addEventListener("load", () => {
   setDebug(
@@ -169,14 +169,19 @@ class TreasureEngine {
       return;
     }
 
-    // ===== マーカーロード自体の成否（行 約215付近） =====
-    this.els.marker.addEventListener("markerFound", () => {
-      setDebug("✅ マーカー検知！(markerFound)");
+    // MindARでは markerFound/markerLost ではなく targetFound/targetLost
+    this.els.marker.addEventListener("targetFound", () => {
+      setDebug("✅ マーカー検知！(targetFound)");
       this.triggerAppear();
     });
 
-    this.els.marker.addEventListener("markerLost", () => {
-      setDebug("マーカーロスト(markerLost)\n再度カメラを向けてください");
+    this.els.marker.addEventListener("targetLost", () => {
+      setDebug("マーカーロスト(targetLost)\n再度カメラを向けてください");
+      // MindARはtargetLost時、IDLEに戻して再出現できるようにする
+      if (this.state === 'READY_TO_OPEN') {
+        this.state = 'IDLE';
+        this.els.wrapper.setAttribute('scale', '0 0 0');
+      }
     });
 
     document.body.addEventListener("click", () => {
@@ -268,7 +273,7 @@ class TreasureEngine {
 
 let engineInstance = null;
 window.startAR = async function() {
-  setDebug("カメラ起動中...");
+  setDebug("サウンド初期化中...(カメラはMindARが自動起動済み)");
   if (!engineInstance) {
     engineInstance = new TreasureEngine();
     await engineInstance.sound.init();
