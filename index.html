@@ -30,7 +30,7 @@
 
 <a-scene
   embedded
-  mindar-image="imageTargetSrc: ARot_marker.mind; autoStart: true; uiScanning: no; uiLoading: no; uiVR: false;"
+  mindar-image="imageTargetSrc: ARot_marker.mind; autoStart: true; uiScanning: no; uiLoading: no; uiVR: false; filterMinCF: 0.001; filterBeta: 0.01;"
   renderer="alpha: true; logarithmicDepthBuffer: true; colorManagement: true;"
   vr-mode-ui="enabled: false">
 
@@ -42,11 +42,11 @@
 
   <a-entity id="treasure-marker" mindar-image-target="targetIndex: 0">
     <!--
-      【向き修正】AR.js時代はマーカーを「机に水平置き」する前提でY軸=立ち上がる方向
-      として箱を設計していた。MindARはマーカー(画像)を「正面から見る」前提で
-      Z軸=マーカー面から手前に飛び出る方向になる。
-      そのためtreasure-wrapperにX軸-90度回転をかけ、Y軸基準の箱構造を
-      Z軸基準(マーカー面から立ち上がる向き)に変換し、向きのズレを補正する。
+      【向き修正(再調整)】背中(p-back側)をマーカー面に接させたいので回転は不要。
+      ただしp-backはwrapperのローカルz=-0.5にあるため、回転なしのままだと
+      マーカー面(z=0)よりさらに奥(-0.5)に潜り込んでしまう。
+      position.zを+0.5することで、p-back(背中)がちょうどマーカー面(z=0)に
+      フラットに接し、箱全体が画像から手前(+z)に向かって立ち上がる見た目になる。
     -->
     <a-entity id="treasure-wrapper" scale="0 0 0" position="0 0 0.5" rotation="0 0 0">
       <a-box id="bottom-plate" width="1.6" height="0.04" depth="1" position="0 0.02 0" color="#2c2e3e"></a-box>
