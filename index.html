@@ -4,6 +4,14 @@
   <meta charset="utf-8">
   <title>ARot proto</title>
 
+  <!-- ファビコン・アイコン設定 -->
+  <!-- ブラウザタブのアイコン -->
+  <link rel="icon" type="image/jpeg" href="ARot_aicon_512.jpg">
+  <!-- iOS ホーム画面追加時のアイコン -->
+  <link rel="apple-touch-icon" href="ARot_aicon_512.jpg">
+  <!-- Android / PWA用 -->
+  <meta name="theme-color" content="#000000">
+
   <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
@@ -211,9 +219,9 @@ class TreasureEngine {
     if (this.state !== 'IDLE') return;
     this.state = 'APPEARING';
     this.sound.playAppear();
-    await this.anim(this.els.wrapper, "pop1", "scale", "0.8 0.8 0.8", 180, "easeOutQuad");
-    await this.anim(this.els.wrapper, "pop2", "scale", "0.6 0.6 0.6", 120, "easeOutQuad");
-    await this.anim(this.els.wrapper, "pop3", "scale", "0.7 0.7 0.7", 90, "easeOutQuad");
+    await this.anim(this.els.wrapper, "pop1", "scale", "1.2 1.2 1.2", 180, "easeOutQuad");
+    await this.anim(this.els.wrapper, "pop2", "scale", "0.9 0.9 0.9", 120, "easeOutQuad");
+    await this.anim(this.els.wrapper, "pop3", "scale", "1 1 1", 90, "easeOutQuad");
     this.state = 'READY_TO_OPEN';
     setDebug("出現完了\n画面をタップして開封してください");
   }
