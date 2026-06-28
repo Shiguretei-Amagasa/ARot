@@ -2,24 +2,24 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>ARot proto</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ARot</title>
 
-  <!-- ファビコン・アイコン設定 -->
-  <!-- ブラウザタブのアイコン -->
   <link rel="icon" type="image/jpeg" href="ARot_aicon_512.jpg">
-  <!-- iOS ホーム画面追加時のアイコン -->
   <link rel="apple-touch-icon" href="ARot_aicon_512.jpg">
-  <!-- Android / PWA用 -->
   <meta name="theme-color" content="#000000">
 
   <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
   <style>
     html, body {
       margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
       background: transparent;
     }
+
+    /* ===== スタート画面 ===== */
     #start-ui {
       position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
       background: rgba(0,0,0,0.9); color: #00ffff; display: flex;
@@ -28,17 +28,102 @@
       cursor: pointer; text-shadow: 0 0 10px #00ffff;
       text-align: center; padding: 20px; box-sizing: border-box;
     }
+
+    /* ===== 共通オーバーレイ基底 ===== */
+    .overlay {
+      display: none;
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      justify-content: center; align-items: center; flex-direction: column;
+      font-family: monospace; color: #fff; text-align: center;
+      padding: 28px; box-sizing: border-box;
+    }
+    .overlay.visible { display: flex; }
+
+    /* ===== 電話番号入力 ===== */
+    #phone-ui {
+      background: rgba(0,0,0,0.93);
+      z-index: 10000;
+    }
+    #phone-ui h2 {
+      color: #00ffff; font-size: 1.05rem; margin: 0 0 6px;
+      text-shadow: 0 0 8px #00ffff;
+    }
+    #phone-ui .sub {
+      font-size: 0.8rem; color: #888; margin: 0 0 22px; line-height: 1.6;
+    }
+    #phone-input {
+      width: 100%; max-width: 280px; padding: 12px 16px;
+      font-size: 1.3rem; border: 2px solid #00ffff;
+      background: #111; color: #fff; border-radius: 6px;
+      text-align: center; letter-spacing: 3px; outline: none;
+      box-sizing: border-box;
+    }
+    #phone-error {
+      color: #ff6b6b; font-size: 0.78rem; margin: 8px 0 0; min-height: 18px;
+    }
+    #send-btn {
+      margin-top: 14px; padding: 13px 0;
+      background: #00ffff; color: #000; border: none;
+      font-family: monospace; font-weight: bold; font-size: 1rem;
+      border-radius: 6px; cursor: pointer;
+      width: 100%; max-width: 280px;
+    }
+    #send-btn:disabled { background: #444; color: #777; cursor: not-allowed; }
+    #skip-btn {
+      margin-top: 16px; color: #555; font-size: 0.78rem;
+      cursor: pointer; text-decoration: underline;
+    }
+
+    /* ===== QR表示 ===== */
+    #qr-ui {
+      background: rgba(0,0,0,0.96);
+      z-index: 10001;
+    }
+    #qr-ui h2 {
+      color: #00ffff; font-size: 1rem; margin: 0 0 4px;
+      text-shadow: 0 0 8px #00ffff;
+    }
+    #qr-sub { font-size: 0.78rem; color: #666; margin: 0 0 16px; }
+    #qrcode-wrap {
+      background: #fff; padding: 14px; border-radius: 10px; margin-bottom: 14px;
+    }
+    #qr-result-text { font-size: 1.5rem; font-weight: bold; margin: 0 0 6px; }
+    #qr-meta { font-size: 0.72rem; color: #777; line-height: 1.8; margin: 0; }
   </style>
 </head>
 <body>
 
-<div id="start-ui" onclick="this.style.display='none'; if(window.startAR) window.startAR();">
-  ■ [TAP TO START ARot PROTO] ■
+<!-- スタート画面 -->
+<div id="start-ui" onclick="this.style.display='none'; window.startAR && window.startAR();">
+  ■ [TAP TO START ARot] ■
 </div>
 
+<!-- 電話番号入力オーバーレイ -->
+<div id="phone-ui" class="overlay">
+  <h2>くじ結果をSMSで受け取る</h2>
+  <p class="sub">会計時にスタッフへご提示ください<br>電話番号を入力してください</p>
+  <input type="tel" id="phone-input" placeholder="09012345678"
+         maxlength="11" inputmode="numeric">
+  <div id="phone-error"></div>
+  <button id="send-btn" onclick="handleSend()">SMSを送る</button>
+  <div id="skip-btn" onclick="handleSkip()">スキップ（この画面をそのまま使う）</div>
+</div>
+
+<!-- QR表示オーバーレイ -->
+<div id="qr-ui" class="overlay">
+  <h2>■ 会計時にご提示ください ■</h2>
+  <p id="qr-sub"></p>
+  <div id="qrcode-wrap"><div id="qrcode"></div></div>
+  <div id="qr-result-text"></div>
+  <p id="qr-meta"></p>
+</div>
+
+<!-- AR シーン -->
 <a-scene
   embedded
-  mindar-image="imageTargetSrc: ARot_marker.mind; autoStart: true; uiScanning: no; uiLoading: no; uiVR: false; filterMinCF: 0.001; filterBeta: 0.01;"
+  mindar-image="imageTargetSrc: ARot_marker.mind; autoStart: true;
+                uiScanning: no; uiLoading: no; uiVR: false;
+                filterMinCF: 0.001; filterBeta: 0.01;"
   renderer="alpha: true; logarithmicDepthBuffer: true; colorManagement: true;"
   vr-mode-ui="enabled: false">
 
@@ -49,35 +134,140 @@
   <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
   <a-entity id="treasure-marker" mindar-image-target="targetIndex: 0">
-    <!--
-      【向き修正(再調整)】背中(p-back側)をマーカー面に接させたいので回転は不要。
-      ただしp-backはwrapperのローカルz=-0.5にあるため、回転なしのままだと
-      マーカー面(z=0)よりさらに奥(-0.5)に潜り込んでしまう。
-      position.zを+0.5することで、p-back(背中)がちょうどマーカー面(z=0)に
-      フラットに接し、箱全体が画像から手前(+z)に向かって立ち上がる見た目になる。
-    -->
     <a-entity id="treasure-wrapper" scale="0 0 0" position="0 0 0.5" rotation="0 0 0">
-      <a-box id="bottom-plate" width="1.6" height="0.04" depth="1" position="0 0.02 0" color="#2c2e3e"></a-box>
-      <a-entity id="p-front" position="0 0 0.5"><a-box width="1.6" height="1" depth="0.04" position="0 0.5 0" color="#2c2e3e"></a-box></a-entity>
-      <a-entity id="p-back" position="0 0 -0.5"><a-box width="1.6" height="1" depth="0.04" position="0 0.5 0" color="#2c2e3e"></a-box></a-entity>
-      <a-entity id="p-left" position="-0.8 0 0"><a-box width="0.04" height="1" depth="1" position="0 0.5 0" color="#2c2e3e"></a-box></a-entity>
-      <a-entity id="p-right" position="0.8 0 0"><a-box width="0.04" height="1" depth="1" position="0 0.5 0" color="#2c2e3e"></a-box></a-entity>
-      <a-entity id="p-top" position="0 1 0">
-        <a-box id="top-plate" width="1.6" height="0.04" depth="1" position="0 0.02 0" color="#3b3e53" material="transparent: true; opacity: 1"></a-box>
+      <a-box id="bottom-plate" width="1.6" height="0.04" depth="1"
+             position="0 0.02 0" color="#2c2e3e"></a-box>
+      <a-entity id="p-front" position="0 0 0.5">
+        <a-box width="1.6" height="1" depth="0.04" position="0 0.5 0" color="#2c2e3e"></a-box>
       </a-entity>
-      <a-plane id="resultPlane" position="0 0.5 0" width="3" height="1.5" material="src: #textCanvas; transparent: true; opacity: 0" scale="0 0 0" rotation="0 0 0"></a-plane>
+      <a-entity id="p-back" position="0 0 -0.5">
+        <a-box width="1.6" height="1" depth="0.04" position="0 0.5 0" color="#2c2e3e"></a-box>
+      </a-entity>
+      <a-entity id="p-left" position="-0.8 0 0">
+        <a-box width="0.04" height="1" depth="1" position="0 0.5 0" color="#2c2e3e"></a-box>
+      </a-entity>
+      <a-entity id="p-right" position="0.8 0 0">
+        <a-box width="0.04" height="1" depth="1" position="0 0.5 0" color="#2c2e3e"></a-box>
+      </a-entity>
+      <a-entity id="p-top" position="0 1 0">
+        <a-box id="top-plate" width="1.6" height="0.04" depth="1"
+               position="0 0.02 0" color="#3b3e53"
+               material="transparent: true; opacity: 1"></a-box>
+      </a-entity>
+      <a-plane id="resultPlane" position="0 0.5 0" width="3" height="1.5"
+               material="src: #textCanvas; transparent: true; opacity: 0"
+               scale="0 0 0" rotation="0 0 0"></a-plane>
     </a-entity>
   </a-entity>
-
 </a-scene>
 
 <script>
-function setDebug(msg) {
-  console.log("[ARot]", msg);
+// ============================================================
+// グローバル状態
+// ============================================================
+let _result    = null;  // くじ結果
+let _acquiredAt = null; // 取得日時
+
+// ============================================================
+// 日時フォーマット
+// ============================================================
+function formatDateTime(date) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${date.getFullYear()}/${pad(date.getMonth()+1)}/${pad(date.getDate())} `
+       + `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-setDebug("ページ読み込み完了\nカメラ自動起動中...");
+// ============================================================
+// 顧客ID生成（電話番号 → SHA-256 → 12桁）
+// ============================================================
+async function generateCustomerId(phone) {
+  const enc = new TextEncoder();
+  const buf = await crypto.subtle.digest('SHA-256', enc.encode(phone + '_arot'));
+  return Array.from(new Uint8Array(buf))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('').slice(0, 12).toUpperCase();
+}
 
+// ============================================================
+// 1日1回制限
+// ============================================================
+function hasUsedToday() {
+  return localStorage.getItem('arot_used') === new Date().toDateString();
+}
+function markUsedToday() {
+  localStorage.setItem('arot_used', new Date().toDateString());
+}
+
+// ============================================================
+// QR表示
+// ============================================================
+function showQR(customerId, smsSent) {
+  const dtStr = formatDateTime(_acquiredAt);
+  // QRに埋め込む情報
+  const qrContent = [
+    'AROT',
+    `ID:${customerId}`,
+    `DISC:${_result}`,
+    `AT:${_acquiredAt.toISOString()}`
+  ].join('|');
+
+  const el = document.getElementById('qrcode');
+  el.innerHTML = '';
+  new QRCode(el, {
+    text: qrContent, width: 200, height: 200,
+    colorDark: '#000', colorLight: '#fff',
+    correctLevel: QRCode.CorrectLevel.M
+  });
+
+  const emoji =
+    _result === '残念'   ? '😢 残念'    :
+    _result === '5%OFF'  ? '🎉 5% OFF'  : '🎊 10% OFF';
+
+  document.getElementById('qr-result-text').textContent = emoji;
+  document.getElementById('qr-meta').innerHTML =
+    `お客様ID: ${customerId}<br>取得日時: ${dtStr}`;
+  document.getElementById('qr-sub').textContent =
+    smsSent ? '✅ SMSにも送信しました' : '📱 この画面をスタッフへご提示ください';
+
+  document.getElementById('phone-ui').classList.remove('visible');
+  document.getElementById('qr-ui').classList.add('visible');
+}
+
+// ============================================================
+// SMS送信（プロトタイプ: 実際には送信せず疑似完了）
+// ============================================================
+async function handleSend() {
+  const input   = document.getElementById('phone-input');
+  const errorEl = document.getElementById('phone-error');
+  const btn     = document.getElementById('send-btn');
+  const phone   = input.value.replace(/\D/g, '');
+
+  if (!/^0\d{9,10}$/.test(phone)) {
+    errorEl.textContent = '正しい電話番号を入力してください（10〜11桁）';
+    return;
+  }
+  errorEl.textContent = '';
+  btn.disabled = true;
+  btn.textContent = '送信中...';
+
+  // 疑似送信（500ms待機で「送ったふり」）
+  await new Promise(r => setTimeout(r, 500));
+
+  const customerId = await generateCustomerId(phone);
+  markUsedToday();
+  showQR(customerId, true); // smsSent=true（疑似）
+}
+
+// スキップ（仮IDでQRのみ）
+function handleSkip() {
+  const tempId = 'SKIP_' + Date.now().toString(36).toUpperCase().slice(-6);
+  markUsedToday();
+  showQR(tempId, false);
+}
+
+// ============================================================
+// SoundManager
+// ============================================================
 class SoundManager {
   constructor() { this.ctx = null; this.unlocked = false; }
   async init() {
@@ -85,185 +275,193 @@ class SoundManager {
       if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
       if (this.ctx.state === 'suspended') await this.ctx.resume();
       this.unlocked = true;
-      console.log("🔊 Web Audio 初期化完了");
-    } catch(e) { console.warn("Audio init deferred:", e); }
+    } catch(e) {}
   }
-  scheduleTone(freq, type, startTimeOffset, duration, vol) {
+  tone(freq, type, t, dur, vol) {
     if (!this.unlocked || !this.ctx) return;
-    const startTime = this.ctx.currentTime + startTimeOffset;
-    const o = this.ctx.createOscillator();
-    const g = this.ctx.createGain();
+    const st = this.ctx.currentTime + t;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
     o.type = type; o.connect(g); g.connect(this.ctx.destination);
-    o.frequency.setValueAtTime(freq, startTime);
-    g.gain.setValueAtTime(0, startTime);
-    g.gain.linearRampToValueAtTime(vol, startTime + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-    o.start(startTime); o.stop(startTime + duration);
+    o.frequency.setValueAtTime(freq, st);
+    g.gain.setValueAtTime(0, st);
+    g.gain.linearRampToValueAtTime(vol, st + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, st + dur);
+    o.start(st); o.stop(st + dur);
   }
-  playAppear() { this.scheduleTone(400, 'sine', 0, 0.1, 0.08); this.scheduleTone(600, 'sine', 0.08, 0.15, 0.08); }
-  playOpen() { this.scheduleTone(100, 'sawtooth', 0, 0.2, 0.15); this.scheduleTone(180, 'square', 0.05, 0.15, 0.1); }
+  playAppear() {
+    this.tone(400,'sine',0,0.1,0.08);
+    this.tone(600,'sine',0.08,0.15,0.08);
+  }
+  playOpen() {
+    this.tone(100,'sawtooth',0,0.2,0.15);
+    this.tone(180,'square',0.05,0.15,0.1);
+  }
   playResult(type) {
-    if (type === "残念") {
-      this.scheduleTone(280, 'triangle', 0, 0.2, 0.1); this.scheduleTone(220, 'triangle', 0.15, 0.4, 0.1);
-    } else if (type === "5%OFF") {
-      this.scheduleTone(523.25, 'sine', 0, 0.15, 0.1); this.scheduleTone(659.25, 'sine', 0.08, 0.15, 0.1); this.scheduleTone(783.99, 'sine', 0.16, 0.5, 0.1);
+    if (type === '残念') {
+      this.tone(280,'triangle',0,0.2,0.1);
+      this.tone(220,'triangle',0.15,0.4,0.1);
+    } else if (type === '5%OFF') {
+      this.tone(523.25,'sine',0,0.15,0.1);
+      this.tone(659.25,'sine',0.08,0.15,0.1);
+      this.tone(783.99,'sine',0.16,0.5,0.1);
     } else {
-      this.scheduleTone(523.25, 'sine', 0, 0.6, 0.08); this.scheduleTone(659.25, 'sine', 0.05, 0.6, 0.08); this.scheduleTone(783.99, 'sine', 0.1, 0.6, 0.08); this.scheduleTone(1046.50, 'sine', 0.15, 0.8, 0.1);
+      this.tone(523.25,'sine',0,0.6,0.08);
+      this.tone(659.25,'sine',0.05,0.6,0.08);
+      this.tone(783.99,'sine',0.1,0.6,0.08);
+      this.tone(1046.50,'sine',0.15,0.8,0.1);
     }
   }
 }
 
+// ============================================================
+// TreasureEngine
+// ============================================================
 class TreasureEngine {
   constructor() {
     this.sound = new SoundManager();
     this.state = 'IDLE';
-    this.ctx = null;
-    this.canvasEl = document.querySelector("#textCanvas");
+    this.canvasEl = document.querySelector('#textCanvas');
+    this.ctx = this.canvasEl ? this.canvasEl.getContext('2d') : null;
 
     this.config = {
-      "残念":   { color: "#777777", scale: "0.9 0.9 0.9", rot: "0 0 0",   glow: 5,   soundType: "残念" },
-      "5%OFF":  { color: "#1E90FF", scale: "1.3 1.3 1.3", rot: "0 0 2",   glow: 25,  soundType: "5%OFF" },
-      "10%OFF": { color: "#FFD700", scale: "1.8 1.8 1.8", rot: "0 0 -6",  glow: 60,  soundType: "10%OFF" }
+      '残念':   { color:'#777777', scale:'0.9 0.9 0.9', rot:'0 0 0',   glow:5,  soundType:'残念'  },
+      '5%OFF':  { color:'#1E90FF', scale:'1.3 1.3 1.3', rot:'0 0 2',   glow:25, soundType:'5%OFF' },
+      '10%OFF': { color:'#FFD700', scale:'1.8 1.8 1.8', rot:'0 0 -6',  glow:60, soundType:'10%OFF'}
     };
 
-    this.initEntities();
-    this.bindAREvents();
-    console.log("🛠️ TreasureEngine が初期化されました");
-  }
-
-  initEntities() {
     this.els = {
-      scene: document.querySelector("a-scene"),
-      marker: document.querySelector("#treasure-marker"),
-      wrapper: document.querySelector("#treasure-wrapper"),
-      pFront: document.querySelector("#p-front"),
-      pBack: document.querySelector("#p-back"),
-      pLeft: document.querySelector("#p-left"),
-      pRight: document.querySelector("#p-right"),
-      pTop: document.querySelector("#p-top"),
-      topPlate: document.querySelector("#top-plate"),
-      result: document.querySelector("#resultPlane")
+      marker:   document.querySelector('#treasure-marker'),
+      wrapper:  document.querySelector('#treasure-wrapper'),
+      pFront:   document.querySelector('#p-front'),
+      pBack:    document.querySelector('#p-back'),
+      pLeft:    document.querySelector('#p-left'),
+      pRight:   document.querySelector('#p-right'),
+      pTop:     document.querySelector('#p-top'),
+      topPlate: document.querySelector('#top-plate'),
+      result:   document.querySelector('#resultPlane')
     };
-    this.initCanvasContext();
+
+    this.bindEvents();
   }
 
-  initCanvasContext() {
-    if (this.canvasEl && !this.ctx) {
-      this.ctx = this.canvasEl.getContext("2d");
-    }
-  }
+  bindEvents() {
+    if (!this.els.marker) return;
 
-  bindAREvents() {
-    if (!this.els.marker) {
-      setDebug("エラー: #treasure-marker 要素が見つかりません");
-      return;
-    }
-
-    this.els.marker.addEventListener("targetFound", () => {
-      setDebug("✅ マーカー検知！(targetFound)");
-      this.triggerAppear();
+    this.els.marker.addEventListener('targetFound', () => {
+      if (hasUsedToday()) {
+        this.appearOnly(); // 当日使用済みは出現のみ
+        return;
+      }
+      this.appear();
     });
 
-    this.els.marker.addEventListener("targetLost", () => {
-      setDebug("マーカーロスト(targetLost)\n再度カメラを向けてください");
+    this.els.marker.addEventListener('targetLost', () => {
       if (this.state === 'READY_TO_OPEN') {
         this.state = 'IDLE';
         this.els.wrapper.setAttribute('scale', '0 0 0');
       }
     });
 
-    document.body.addEventListener("click", () => {
-      if (this.state === 'READY_TO_OPEN') {
-        this.triggerOpen();
-      }
+    document.body.addEventListener('click', () => {
+      if (this.state === 'READY_TO_OPEN') this.open();
     });
   }
 
-  anim(el, id, prop, to, dur, easing) {
+  anim(el, id, prop, to, dur, ease) {
     return new Promise(resolve => {
-      if(!el) return resolve();
-      const attrName = `animation__${id}`;
-      el.removeAttribute(attrName);
+      if (!el) return resolve();
+      const k = `animation__${id}`;
+      el.removeAttribute(k);
       setTimeout(() => {
-        el.setAttribute(attrName, `property: ${prop}; to: ${to}; dur: ${dur}; easing: ${easing}`);
+        el.setAttribute(k, `property:${prop};to:${to};dur:${dur};easing:${ease}`);
         el.addEventListener(`animationcomplete__${id}`, resolve, { once: true });
       }, 20);
     });
   }
 
-  renderText(resultKey) {
-    if (!this.ctx) this.initCanvasContext();
-    const ctx = this.ctx;
-    if (!ctx) return;
-
-    const canvasEl = this.canvasEl;
-    const cfg = this.config[resultKey];
-
-    ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
-    ctx.font = "bold 160px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.shadowColor = cfg.color;
-    ctx.shadowBlur = cfg.glow;
-    ctx.lineWidth = 12;
-    ctx.strokeStyle = "#000000";
-    ctx.strokeText(resultKey, canvasEl.width / 2, canvasEl.height / 2);
-    ctx.fillStyle = "#ffffff";
-    ctx.fillText(resultKey, canvasEl.width / 2, canvasEl.height / 2);
-
+  renderText(key) {
+    if (!this.ctx) return;
+    const cfg = this.config[key], c = this.canvasEl;
+    this.ctx.clearRect(0, 0, c.width, c.height);
+    this.ctx.font = 'bold 160px sans-serif';
+    this.ctx.textAlign = 'center'; this.ctx.textBaseline = 'middle';
+    this.ctx.shadowColor = cfg.color; this.ctx.shadowBlur = cfg.glow;
+    this.ctx.lineWidth = 12; this.ctx.strokeStyle = '#000';
+    this.ctx.strokeText(key, c.width/2, c.height/2);
+    this.ctx.fillStyle = '#fff';
+    this.ctx.fillText(key, c.width/2, c.height/2);
     const mesh = this.els.result.getObject3D('mesh');
-    if (mesh && mesh.material.map) mesh.material.map.needsUpdate = true;
+    if (mesh?.material?.map) mesh.material.map.needsUpdate = true;
   }
 
-  async triggerAppear() {
+  async appear() {
     if (this.state !== 'IDLE') return;
     this.state = 'APPEARING';
     this.sound.playAppear();
-    await this.anim(this.els.wrapper, "pop1", "scale", "1.2 1.2 1.2", 180, "easeOutQuad");
-    await this.anim(this.els.wrapper, "pop2", "scale", "0.9 0.9 0.9", 120, "easeOutQuad");
-    await this.anim(this.els.wrapper, "pop3", "scale", "1 1 1", 90, "easeOutQuad");
+    await this.anim(this.els.wrapper, 'p1', 'scale', '0.84 0.84 0.84', 180, 'easeOutQuad');
+    await this.anim(this.els.wrapper, 'p2', 'scale', '0.63 0.63 0.63', 120, 'easeOutQuad');
+    await this.anim(this.els.wrapper, 'p3', 'scale', '0.70 0.70 0.70', 90,  'easeOutQuad');
     this.state = 'READY_TO_OPEN';
-    setDebug("出現完了\n画面をタップして開封してください");
   }
 
-  async triggerOpen() {
+  async appearOnly() {
+    if (this.state !== 'IDLE') return;
+    this.state = 'USED';
+    this.sound.playAppear();
+    await this.anim(this.els.wrapper, 'p1', 'scale', '0.84 0.84 0.84', 180, 'easeOutQuad');
+    await this.anim(this.els.wrapper, 'p2', 'scale', '0.63 0.63 0.63', 120, 'easeOutQuad');
+    await this.anim(this.els.wrapper, 'p3', 'scale', '0.70 0.70 0.70', 90,  'easeOutQuad');
+  }
+
+  async open() {
     this.state = 'OPENING';
     this.sound.playOpen();
+
     const keys = Object.keys(this.config);
-    const resultKey = keys[Math.floor(Math.random() * keys.length)];
-    const cfg = this.config[resultKey];
+    const key  = keys[Math.floor(Math.random() * keys.length)];
+    const cfg  = this.config[key];
+    _result     = key;
+    _acquiredAt = new Date(); // 取得日時を記録
 
-    this.renderText(resultKey);
+    this.renderText(key);
 
-    const boxPromise = Promise.all([
-      this.anim(this.els.pFront, "open_f", "rotation", "90 0 0", 400, "easeOutBack"),
-      this.anim(this.els.pBack,  "open_b", "rotation", "-90 0 0", 400, "easeOutBack"),
-      this.anim(this.els.pLeft,  "open_l", "rotation", "0 0 90", 400, "easeOutBack"),
-      this.anim(this.els.pRight, "open_r", "rotation", "0 0 -90", 400, "easeOutBack"),
-      this.anim(this.els.pTop,   "open_t", "position", "0 2.5 0", 400, "easeOutQuad"),
-      this.anim(this.els.topPlate, "fade_t", "material.opacity", "0", 350, "linear")
+    const boxAnim = Promise.all([
+      this.anim(this.els.pFront,   'of', 'rotation',         '90 0 0',  400, 'easeOutBack'),
+      this.anim(this.els.pBack,    'ob', 'rotation',         '-90 0 0', 400, 'easeOutBack'),
+      this.anim(this.els.pLeft,    'ol', 'rotation',         '0 0 90',  400, 'easeOutBack'),
+      this.anim(this.els.pRight,   'or', 'rotation',         '0 0 -90', 400, 'easeOutBack'),
+      this.anim(this.els.pTop,     'ot', 'position',         '0 2.5 0', 400, 'easeOutQuad'),
+      this.anim(this.els.topPlate, 'ft', 'material.opacity', '0',       350, 'linear')
     ]);
 
     await new Promise(r => setTimeout(r, 150));
     this.sound.playResult(cfg.soundType);
 
     await Promise.all([
-      boxPromise,
-      this.anim(this.els.result, "show_s", "scale", cfg.scale, 700, "easeOutBack"),
-      this.anim(this.els.result, "show_f", "material.opacity", "1", 400, "linear"),
-      this.anim(this.els.result, "show_r", "rotation", cfg.rot, 700, "easeOutQuad"),
-      this.anim(this.els.result, "show_p", "position", "0 1.8 0", 700, "easeOutBack")
+      boxAnim,
+      this.anim(this.els.result, 'ss', 'scale',            cfg.scale, 700, 'easeOutBack'),
+      this.anim(this.els.result, 'sf', 'material.opacity', '1',       400, 'linear'),
+      this.anim(this.els.result, 'sr', 'rotation',         cfg.rot,   700, 'easeOutQuad'),
+      this.anim(this.els.result, 'sp', 'position',         '0 1.8 0', 700, 'easeOutBack')
     ]);
-    this.state = 'DONE';
-    setDebug("結果表示完了: " + resultKey);
+
+    this.state = 'AWAITING_PHONE';
+
+    // 開封演出の1秒後に電話番号入力を表示
+    setTimeout(() => {
+      document.getElementById('phone-ui').classList.add('visible');
+    }, 1000);
   }
 }
 
-let engineInstance = null;
+// ============================================================
+// 起動
+// ============================================================
+let engine = null;
 window.startAR = async function() {
-  if (!engineInstance) {
-    engineInstance = new TreasureEngine();
-    await engineInstance.sound.init();
+  if (!engine) {
+    engine = new TreasureEngine();
+    await engine.sound.init();
   }
 };
 </script>
