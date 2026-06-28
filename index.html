@@ -211,9 +211,9 @@ class TreasureEngine {
     if (this.state !== 'IDLE') return;
     this.state = 'APPEARING';
     this.sound.playAppear();
-    await this.anim(this.els.wrapper, "pop1", "scale", "1.2 1.2 1.2", 180, "easeOutQuad");
-    await this.anim(this.els.wrapper, "pop2", "scale", "0.9 0.9 0.9", 120, "easeOutQuad");
-    await this.anim(this.els.wrapper, "pop3", "scale", "1 1 1", 90, "easeOutQuad");
+    await this.anim(this.els.wrapper, "pop1", "scale", "0.8 0.8 0.8", 180, "easeOutQuad");
+    await this.anim(this.els.wrapper, "pop2", "scale", "0.6 0.6 0.6", 120, "easeOutQuad");
+    await this.anim(this.els.wrapper, "pop3", "scale", "0.7 0.7 0.7", 90, "easeOutQuad");
     this.state = 'READY_TO_OPEN';
     setDebug("出現完了\n画面をタップして開封してください");
   }
