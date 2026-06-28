@@ -39,7 +39,25 @@
     }
     .overlay.visible { display: flex; }
 
-    /* ===== 電話番号入力 ===== */
+    /* ===== ARクリック受付オーバーレイ（A-Frameのcanvasを透過してクリックを確実に拾う） ===== */
+    #ar-tap {
+      display: none;
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      z-index: 500; /* AR sceneより前、他のUIより後ろ */
+      cursor: pointer;
+      /* タップヒントを下部に表示 */
+      justify-content: flex-end; align-items: center; flex-direction: column;
+      padding-bottom: 48px; box-sizing: border-box;
+    }
+    #ar-tap.visible { display: flex; }
+    #ar-tap-hint {
+      background: rgba(0,0,0,0.55); color: #fff;
+      font-family: monospace; font-size: 0.85rem;
+      padding: 8px 20px; border-radius: 20px;
+      letter-spacing: 1px; pointer-events: none;
+    }
+
+    
     #phone-ui {
       background: rgba(0,0,0,0.93);
       z-index: 10000;
@@ -92,6 +110,11 @@
   </style>
 </head>
 <body>
+
+<!-- ARクリック受付オーバーレイ（A-Frameのcanvasより前面に置いてクリックを確実に受け取る） -->
+<div id="ar-tap" onclick="handleArTap()">
+  <div id="ar-tap-hint">TAP TO OPEN</div>
+</div>
 
 <!-- スタート画面 -->
 <div id="start-ui" onclick="this.style.display='none'; window.startAR && window.startAR();">
@@ -169,7 +192,20 @@ let _result    = null;  // くじ結果
 let _acquiredAt = null; // 取得日時
 
 // ============================================================
-// 日時フォーマット
+// ARタップ処理（宝箱クリック / 結果表示後クリックの2段階）
+// ============================================================
+function handleArTap() {
+  if (!engine) return;
+  if (engine.state === 'READY_TO_OPEN') {
+    engine.open();
+  } else if (engine.state === 'RESULT_SHOWN') {
+    document.getElementById('ar-tap').classList.remove('visible');
+    document.getElementById('phone-ui').classList.add('visible');
+    engine.state = 'AWAITING_PHONE';
+  }
+}
+
+
 // ============================================================
 function formatDateTime(date) {
   const pad = n => String(n).padStart(2, '0');
@@ -349,7 +385,7 @@ class TreasureEngine {
 
     this.els.marker.addEventListener('targetFound', () => {
       if (hasUsedToday()) {
-        this.appearOnly(); // 当日使用済みは出現のみ
+        this.appearOnly();
         return;
       }
       this.appear();
@@ -359,12 +395,11 @@ class TreasureEngine {
       if (this.state === 'READY_TO_OPEN') {
         this.state = 'IDLE';
         this.els.wrapper.setAttribute('scale', '0 0 0');
+        document.getElementById('ar-tap').classList.remove('visible');
       }
     });
-
-    document.body.addEventListener('click', () => {
-      if (this.state === 'READY_TO_OPEN') this.open();
-    });
+    // ※ クリックはar-tapオーバーレイのonclick(handleArTap)で受け取るため
+    //   document.body.addEventListenerは使わない
   }
 
   anim(el, id, prop, to, dur, ease) {
@@ -402,6 +437,10 @@ class TreasureEngine {
     await this.anim(this.els.wrapper, 'p2', 'scale', '0.63 0.63 0.63', 120, 'easeOutQuad');
     await this.anim(this.els.wrapper, 'p3', 'scale', '0.70 0.70 0.70', 90,  'easeOutQuad');
     this.state = 'READY_TO_OPEN';
+    // タップ受付オーバーレイを表示
+    const tap = document.getElementById('ar-tap');
+    document.getElementById('ar-tap-hint').textContent = 'TAP TO OPEN';
+    tap.classList.add('visible');
   }
 
   async appearOnly() {
@@ -445,12 +484,9 @@ class TreasureEngine {
       this.anim(this.els.result, 'sp', 'position',         '0 1.8 0', 700, 'easeOutBack')
     ]);
 
-    this.state = 'AWAITING_PHONE';
-
-    // 開封演出の1秒後に電話番号入力を表示
-    setTimeout(() => {
-      document.getElementById('phone-ui').classList.add('visible');
-    }, 1000);
+    this.state = 'RESULT_SHOWN';
+    // 結果確認後のタップを促すヒントに切り替え
+    document.getElementById('ar-tap-hint').textContent = 'TAP TO CONTINUE';
   }
 }
 
